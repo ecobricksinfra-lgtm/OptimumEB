@@ -9,12 +9,14 @@ import {
   transferLeads,
   updateLead,
   uploadLeadDocuments,
+  bulkUploadLeads,
 } from "./lead.controller.js";
 import { upload } from "../../../config/multer.js";
 
 const leadRoute = Router();
 
 leadRoute.post("/add", createLead);
+leadRoute.post("/bulk-upload", bulkUploadLeads);
 
 // leadRoute.get("/campaign/:campaignId", getLeadsByCampaign);
 leadRoute.get("/getallleads", getAllLeads);

@@ -128,32 +128,110 @@ class EmployeeService {
     });
 
     // ✅ OFFICE LOCATION CHECK
+    // Location check applies to:
+    // - Non-admin employees
+    // - Without WFT (Work From Anywhere) permission
+    // - Without WFH (Work From Home) approval
+    
     if (employee.department?.toLowerCase() !== "admin") {
-      if (!employee.wfhApproved) {
+      // ✅ If WFT is true, employee can login from anywhere
+      if (employee.wft) {
+        console.log("✅ WFT enabled - skipping location check");
+      }
+      // ✅ Else if WFH is approved, employee can login from anywhere
+      else if (employee.wfhApproved) {
+        console.log("✅ WFH approved - skipping location check");
+      }
+      // ✅ Otherwise, check office location (20-25 meter radius)
+      else {
         if (!location) throw new Error("Location required for office login");
+        
+        // Check if office location is set in employee record
         if (
           !employee.officeLocation ||
-          employee.officeLocation.lat === undefined
-        )
+          employee.officeLocation.lat === 0 ||
+          employee.officeLocation.lng === 0
+        ) {
           throw new Error(
-            "Employee office location not set. Cannot login at office."
+            "Employee office location not configured. Cannot verify office login. Contact admin to set office location."
           );
+        }
 
         const { lat: userLat, lng: userLng } = location;
         const { lat: officeLat, lng: officeLng } = employee.officeLocation;
 
+        // ✅ DETAILED DEBUG LOGGING
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        console.log("📍 LOCATION VERIFICATION DEBUG");
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        
+        console.log("\n🌍 DATABASE - OFFICE LOCATION:");
+        console.log(`   Latitude (lat):  ${officeLat}`);
+        console.log(`   Longitude (lng): ${officeLng}`);
+        console.log(`   Type (lat): ${typeof officeLat}`);
+        console.log(`   Type (lng): ${typeof officeLng}`);
+        
+        console.log("\n📱 BROWSER - CURRENT USER LOCATION:");
+        console.log(`   Latitude (lat):  ${userLat}`);
+        console.log(`   Longitude (lng): ${userLng}`);
+        console.log(`   Type (lat): ${typeof userLat}`);
+        console.log(`   Type (lng): ${typeof userLng}`);
+        
+        console.log("\n🔍 COMPARISON:");
+        console.log(`   Database lat === Browser lat: ${officeLat === userLat}`);
+        console.log(`   Database lng === Browser lng: ${officeLng === userLng}`);
+        
+        console.log("\n📏 DIFFERENCE:");
+        const latDiff = Math.abs(officeLat - userLat);
+        const lngDiff = Math.abs(officeLng - userLng);
+        console.log(`   Latitude difference:  ${latDiff}`);
+        console.log(`   Longitude difference: ${lngDiff}`);
+        
+        console.log("\n⚙️ DISTANCE CALCULATION:");
+        
+        // ✅ UPDATED: Radius changed to 0.1 km (100m)
+        // This allows login within 100 meter radius of office location
+        const OFFICE_RADIUS_KM = 0.1; // 100 meters in km
+        console.log(`   Allowed radius: ${OFFICE_RADIUS_KM} km (${OFFICE_RADIUS_KM * 1000} meters)`);
+        
         const allowed = isWithinOffice(
           userLat,
           userLng,
           officeLat,
           officeLng,
-          0.1
+          OFFICE_RADIUS_KM
         );
-        if (!allowed)
-          throw new Error("Login allowed only within office location");
+        
+        // Calculate actual distance for logging
+        const toRad = (value) => (value * Math.PI) / 180;
+        const R = 6371;
+        const dLat = toRad(userLat - officeLat);
+        const dLng = toRad(userLng - officeLng);
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(officeLat)) *
+            Math.cos(toRad(userLat)) *
+            Math.sin(dLng / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distance = R * c;
+        const distanceMeters = distance * 1000;
+        
+        console.log(`   Calculated distance: ${distance.toFixed(4)} km (${distanceMeters.toFixed(0)} meters)`);
+        
+        console.log("\n✅ RESULT:");
+        console.log(`   Within 100m radius: ${allowed}`);
+        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+        
+        if (!allowed) {
+          throw new Error(
+            `Login allowed only within office location (100 meter radius). Current distance: ${distanceMeters.toFixed(0)}m. Please move closer to office location or enable WFT/WFH.`
+          );
+        }
+        
+        console.log("✅ Location verified - within office radius");
       }
     } else {
-      console.log("Admin login detected — skipping office location check");
+      console.log("✅ Admin user - skipping office location check");
     }
 
     return {
@@ -172,6 +250,8 @@ class EmployeeService {
         },
         department: employee.department,
         wfhApproved: employee.wfhApproved,
+        wft: employee.wft,
+        officeLocation: employee.officeLocation,
         status: employee.status,
         tasks,
         lastlogin: previousLogin,

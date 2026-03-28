@@ -182,6 +182,101 @@ class LeadService {
 
     return updatedLead;
   }
+
+  // ===============================
+  // ✅ BULK UPLOAD LEADS
+  // ===============================
+  static async bulkUploadLeads(campaignId, leadsData) {
+    try {
+      // ✅ Get campaign
+      const campaign = await CampaignModel.findById(campaignId);
+      if (!campaign) {
+        throw new Error("Campaign not found");
+      }
+
+      const idname = "Leads";
+      const idcode = "L";
+      await IdcodeServices.addIdCode(idname, idcode);
+
+      let uploadedCount = 0;
+      let skippedCount = 0;
+      const errors = [];
+
+      // ✅ Process each lead
+      for (let i = 0; i < leadsData.length; i++) {
+        try {
+          const leadData = leadsData[i];
+
+          // ✅ Validate required fields
+          if (!leadData.name || !leadData.phone) {
+            errors.push({
+              row: i + 1,
+              error: "Name and phone are required",
+            });
+            skippedCount++;
+            continue;
+          }
+
+          // ✅ Normalize phone (remove non-digits)
+          const phone = String(leadData.phone).replace(/\D/g, "");
+
+          // ✅ Check if lead already exists (by phone)
+          const existingLead = await LeadModel.findOne({ phone });
+          if (existingLead) {
+            skippedCount++;
+            continue;
+          }
+
+          // ✅ Generate lead ID
+          const lead_id = await IdcodeServices.generateCode(idname);
+
+          // ✅ Create lead object
+          const newLead = {
+            ...leadData,
+            lead_id,
+            phone,
+            campaign: campaign._id,
+            campaign_id: campaign.campaign_id,
+            status: leadData.status || "new",
+          };
+
+          // ✅ Create lead in database
+          const createdLead = await LeadModel.create(newLead);
+
+          // ✅ Add lead to campaign
+          if (!campaign.leads.includes(createdLead._id)) {
+            campaign.leads.push(createdLead._id);
+          }
+
+          uploadedCount++;
+        } catch (error) {
+          console.error(`Error processing row ${i + 1}:`, error.message);
+          errors.push({
+            row: i + 1,
+            error: error.message,
+          });
+          skippedCount++;
+        }
+      }
+
+      // ✅ Save campaign with updated leads
+      await campaign.save();
+
+      console.log(
+        `✅ Bulk upload complete: ${uploadedCount} uploaded, ${skippedCount} skipped`
+      );
+
+      return {
+        uploadedCount,
+        skippedCount,
+        totalAttempted: leadsData.length,
+        errors: errors.length > 0 ? errors.slice(0, 10) : [], // Return first 10 errors
+      };
+    } catch (error) {
+      console.error("❌ Bulk upload service error:", error);
+      throw error;
+    }
+  }
 }
 
 export default LeadService;

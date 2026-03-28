@@ -1,6 +1,6 @@
 // ====================================
 // FILE: src/module/employee/employee.model.js
-// FIXED: Made officialEmail optional for backward compatibility with existing data
+// FIXED: Made jobTitle optional (not required)
 // ====================================
 
 import mongoose from "mongoose";
@@ -42,6 +42,8 @@ const employeeSchema = new mongoose.Schema(
     jobTitle: {
       type: String,
       trim: true,
+      // FIXED: Removed required: true
+      // Now jobTitle is optional
     },
     dateOfJoining: {
       type: Date,
@@ -55,56 +57,19 @@ const employeeSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // ✅ CONTACT DETAILS - OLD (Keep for backward compatibility with existing data)
+    // ✅ CONTACT DETAILS
     phone: {
       type: String,
       trim: true,
     },
     email: {
       type: String,
+      required: true,
+      unique: true,
       lowercase: true,
       trim: true,
       sparse: true,
     },
-
-    // ✅ CONTACT DETAILS - OFFICIAL (NEW - Optional for backward compatibility)
-    // ⚠️ IMPORTANT: Made optional (no required: true) so existing employees work
-    officialEmail: {
-      type: String,
-      lowercase: true,
-      trim: true,
-      sparse: true,
-      validate: {
-        validator: function(v) {
-          return !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-        },
-        message: "Invalid email format"
-      }
-    },
-    officialPhone: {
-      type: String,
-      trim: true,
-    },
-
-    // ✅ CONTACT DETAILS - PERSONAL (NEW - Optional)
-    personalEmail: {
-      type: String,
-      lowercase: true,
-      trim: true,
-      sparse: true,
-      validate: {
-        validator: function(v) {
-          return !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-        },
-        message: "Invalid email format"
-      }
-    },
-    personalPhone: {
-      type: String,
-      trim: true,
-    },
-
-    // ✅ ADDRESS
     address: {
       type: String,
       trim: true,
@@ -120,39 +85,9 @@ const employeeSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-
-    // ✅ BANK DETAILS - OLD (Keep for backward compatibility, optional)
     bankAccountNo: {
       type: String,
       trim: true,
-      default: null,
-    },
-
-    // ✅ BANK DETAILS - NEW (Expanded, all optional)
-    bankAccountName: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-    bankAccountNumber: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-    bankAccountType: {
-      type: String,
-      enum: ["Savings", "Current", "Others", null],
-      default: null,
-    },
-    bankIFSCCode: {
-      type: String,
-      trim: true,
-      default: null,
-    },
-    bankName: {
-      type: String,
-      trim: true,
-      default: null,
     },
 
     // ✅ SALARY INFORMATION
@@ -161,6 +96,13 @@ const employeeSchema = new mongoose.Schema(
       default: 0,
     },
     leaveBalance: {
+      type: Number,
+      default: 0,
+    },
+    lastIncrementDate: {
+      type: Date,
+    },
+    lastIncrementCTC: {
       type: Number,
       default: 0,
     },
@@ -206,15 +148,28 @@ const employeeSchema = new mongoose.Schema(
       default: false,
     },
 
-    // ✅ OFFICE LOCATION
+    // ✅ WORK FROM ANYWHERE/ANYTHING (WFT)
+    wft: {
+      type: Boolean,
+      default: false,
+    },
+
+    // ✅ OFFICE LOCATION (Employee's assigned office location for login verification)
     officeLocation: {
       lat: {
         type: Number,
-        default: 0,
+        required: true,
+        default: 9.925416,
       },
       lng: {
         type: Number,
-        default: 0,
+        required: true,
+        default: 78.094837,
+      },
+      address: {
+        type: String,
+        trim: true,
+        default: "",
       },
     },
 
@@ -246,16 +201,11 @@ const employeeSchema = new mongoose.Schema(
   }
 );
 
-// ✅ CREATE INDEXES
+// Create indexes for sparse fields and category
 employeeSchema.index({ aadhaarNumber: 1 }, { sparse: true });
 employeeSchema.index({ employee_id: 1 }, { unique: true, sparse: true });
-employeeSchema.index({ email: 1 }, { sparse: true });
-employeeSchema.index({ officialEmail: 1 }, { sparse: true });
+employeeSchema.index({ email: 1 }, { unique: true, sparse: true });
 employeeSchema.index({ category_name: 1 }, { sparse: true });
-employeeSchema.index({ department: 1 });
-employeeSchema.index({ officialPhone: 1 }, { sparse: true });
-employeeSchema.index({ personalEmail: 1 }, { sparse: true });
-employeeSchema.index({ personalPhone: 1 }, { sparse: true });
 
 // Create and export the Employee model
 const Employee = mongoose.model("Employee", employeeSchema);

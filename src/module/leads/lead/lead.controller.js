@@ -203,3 +203,42 @@ export const updateLead = async (req, res) => {
   }
 };
 
+// ===============================
+// ✅ BULK UPLOAD LEADS
+// ===============================
+export const bulkUploadLeads = async (req, res) => {
+  try {
+    const { campaign_id, leads } = req.body;
+
+    // ✅ Validation
+    if (!campaign_id) {
+      return res.status(400).json({
+        success: false,
+        message: "campaign_id is required",
+      });
+    }
+
+    if (!Array.isArray(leads) || leads.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "leads array is required and must not be empty",
+      });
+    }
+
+    // ✅ Call service
+    const result = await LeadService.bulkUploadLeads(campaign_id, leads);
+
+    res.status(200).json({
+      success: true,
+      message: `Bulk upload successful`,
+      data: result,
+    });
+  } catch (error) {
+    console.error("❌ Bulk upload error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Bulk upload failed",
+    });
+  }
+}
+
